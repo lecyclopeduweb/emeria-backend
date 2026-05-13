@@ -13,6 +13,7 @@ import {
 } from "./lib/rechargePayload.js";
 import { linkRechargeSubscriptionToOrder, getOrderIdForRechargeSubscription } from "./lib/mappingStore.js";
 import { reconstructDraftOrderFromSourceOrder } from "./lib/reconstructDraftOrder.js";
+import { handleOAuthStart, handleOAuthCallback } from "./lib/oauthInstall.js";
 
 const {
     SHOPIFY_SHOP,
@@ -48,7 +49,19 @@ router.get("/health", (_req, res) => {
     res.json({
         ok: true,
         service: "emeria-backend",
-        basePath: PUBLIC_BASE_PATH || "/"
+        basePath: PUBLIC_BASE_PATH || "/",
+        oauth: Boolean(process.env.SHOPIFY_CLIENT_ID && process.env.OAUTH_PUBLIC_URL)
+    });
+});
+
+/** Une fois : obtient SHOPIFY_ADMIN_ACCESS_TOKEN via OAuth (app Partners déjà installée). Voir README. */
+router.get("/oauth/start", (req, res) => handleOAuthStart(req, res));
+router.get("/oauth/callback", (req, res) => {
+    void handleOAuthCallback(req, res).catch((err) => {
+        console.error("[emeria] oauth callback", err);
+        if (!res.headersSent) {
+            res.status(500).send(String(err?.message || err));
+        }
     });
 });
 
