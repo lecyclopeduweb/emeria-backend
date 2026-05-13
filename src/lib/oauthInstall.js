@@ -29,6 +29,53 @@ function redirectUriFromEnv() {
     return base + (path.startsWith("/") ? path : `/${path}`);
 }
 
+function buildAuthorizeUrl(shop, clientId, scopes, redirectUri, state) {
+    const url = new URL(`https://${shop}/admin/oauth/authorize`);
+    url.searchParams.set("client_id", clientId);
+    url.searchParams.set("scope", scopes);
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("state", state);
+    url.searchParams.set("response_type", "code");
+    return url.toString();
+}
+
+/**
+ * Aide au débogage : compare redirect_uri avec la version publiée Partners (doit être identique caractère par caractère).
+ */
+export function handleOAuthDiagnostic(req, res) {
+    const shop = normalizeShop(req.query.shop || process.env.SHOPIFY_SHOP);
+    const clientId = process.env.SHOPIFY_CLIENT_ID?.trim();
+    const scopes = (process.env.OAUTH_SCOPES || "read_orders,write_orders,write_draft_orders,read_customers")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join(",");
+    const redirectUri = redirectUriFromEnv();
+    const dummyState = "diagnostic";
+    const authorizeUrl =
+        shop && clientId && redirectUri
+            ? buildAuthorizeUrl(shop, clientId, scopes, redirectUri, dummyState)
+            : null;
+
+    res.json({
+        shop: shop || null,
+        redirect_uri_computed: redirectUri || null,
+        client_id_length: clientId ? clientId.length : 0,
+        scopes,
+        authorize_url_preview: authorizeUrl,
+        checks: {
+            shop_ok: Boolean(shop),
+            client_id_ok: Boolean(clientId),
+            redirect_ok: Boolean(redirectUri)
+        },
+        tips: [
+            "Dans Partners → version active de l’app, l’URL de redirection autorisée doit être EXACTEMENT la même que redirect_uri_computed (https, pas d’espace, pas de slash en trop).",
+            "Ouvre d’abord l’admin Shopify de cette boutique dans le même navigateur (connexion propriétaire ou staff avec droits apps), puis relance /oauth/start.",
+            "Si l’app n’est pas autorisée pour cette boutique (distribution personnalisée), ajoute la boutique ou utilise le lien d’installation Partners avant OAuth."
+        ]
+    });
+}
+
 /**
  * Démarre OAuth : redirige vers Shopify (app Partners + installation).
  */
@@ -69,13 +116,16 @@ export function handleOAuthStart(req, res) {
     const state = crypto.randomBytes(16).toString("hex");
     stateStore.set(state, { shop, exp: Date.now() + STATE_TTL_MS });
 
-    const url = new URL(`https://${shop}/admin/oauth/authorize`);
-    url.searchParams.set("client_id", clientId);
-    url.searchParams.set("scope", scopes);
-    url.searchParams.set("redirect_uri", redirectUri);
-    url.searchParams.set("state", state);
+    const authorizeUrl = buildAuthorizeUrl(shop, clientId, scopes, redirectUri, state);
 
-    res.redirect(url.toString());
+    if (req.query.debug === "1") {
+        res.type("text/plain; charset=utf-8").send(
+            `Redirect URI (doit matcher Partners) :\n${redirectUri}\n\nURL complète (debug) :\n${authorizeUrl}\n`
+        );
+        return;
+    }
+
+    res.redirect(authorizeUrl);
 }
 
 /**

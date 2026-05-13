@@ -49,9 +49,26 @@ Avec une app créée dans **Partners** + distribution personnalisée, Shopify **
 4. Dans le navigateur (connecté en admin sur la **même** boutique), ouvre :  
    `https://emeria-backend.onrender.com/oauth/start`  
    ou avec secret :  
-   `https://emeria-backend.onrender.com/oauth/start?secret=TON_OAUTH_INSTALL_SECRET`
+   `https://emeria-backend.onrender.com/oauth/start?secret=TON_OAUTH_INSTALL_SECRET`  
+   ou **debug texte** (sans redirection) :  
+   `https://emeria-backend.onrender.com/oauth/start?debug=1`
 
 5. Accepte les droits demandés. La page finale affiche le **jeton** → copie-le dans **`SHOPIFY_ADMIN_ACCESS_TOKEN`** (Render + `.env` local), **redéploie** Render.
+
+### Si Shopify affiche « Oops… Unauthorized Access »
+
+Ce message vient **de Shopify**, pas de Render. Causes fréquentes :
+
+1. **`redirect_uri`** dans la version publiée Partners n’est **pas exactement** la même chaîne que celle calculée par le serveur (https, chemin `/oauth/callback`, pas d’espace, pas de slash en trop).  
+   → Ouvre **`https://emeria-backend.onrender.com/oauth/diagnostic`** et compare **`redirect_uri_computed`** avec le champ **URL de redirection** de la version active de l’app.
+
+2. Tu n’es **pas connecté** à l’admin de **cette** boutique dans le même navigateur (ou compte sans droits suffisants).  
+   → Ouvre d’abord `https://admin.shopify.com/store/…` pour **Passion Kanine**, puis réessaie `/oauth/start`.
+
+3. La boutique n’est **pas autorisée** par ta distribution personnalisée.  
+   → Partners → **Distribution** / lien d’installation : vérifie que la boutique peut installer l’app.
+
+4. **Client ID** sur Render ne correspond pas à l’app / à la version publiée (copier-coller depuis **Identifiants** de la même app).
 
 Les scopes OAuth utilisés sont ceux de **`OAUTH_SCOPES`** (défaut : `read_orders,write_orders,write_draft_orders,read_customers`) ; ils doivent être **autorisés** dans la version publiée de l’app Partners.
 
@@ -61,6 +78,7 @@ Les scopes OAuth utilisés sont ceux de **`OAUTH_SCOPES`** (défaut : `read_orde
 |--------|-----|
 | Santé (test navigateur ou curl) | https://emeria-backend.onrender.com/health |
 | **OAuth (une fois)** | https://emeria-backend.onrender.com/oauth/start |
+| **OAuth diagnostic** | https://emeria-backend.onrender.com/oauth/diagnostic |
 | Webhook Shopify (Admin API / app custom) | https://emeria-backend.onrender.com/webhooks/shopify/orders |
 | Webhook Recharge (optionnel) | https://emeria-backend.onrender.com/webhooks/recharge |
 | Reconstruction manuelle | `POST` https://emeria-backend.onrender.com/hooks/reconstruct |

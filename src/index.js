@@ -13,7 +13,7 @@ import {
 } from "./lib/rechargePayload.js";
 import { linkRechargeSubscriptionToOrder, getOrderIdForRechargeSubscription } from "./lib/mappingStore.js";
 import { reconstructDraftOrderFromSourceOrder } from "./lib/reconstructDraftOrder.js";
-import { handleOAuthStart, handleOAuthCallback } from "./lib/oauthInstall.js";
+import { handleOAuthStart, handleOAuthCallback, handleOAuthDiagnostic } from "./lib/oauthInstall.js";
 
 const {
     SHOPIFY_SHOP,
@@ -53,6 +53,9 @@ router.get("/health", (_req, res) => {
         oauth: Boolean(process.env.SHOPIFY_CLIENT_ID && process.env.OAUTH_PUBLIC_URL)
     });
 });
+
+/** Aide : compare redirect_uri avec Partners (JSON). */
+router.get("/oauth/diagnostic", (req, res) => handleOAuthDiagnostic(req, res));
 
 /** Une fois : obtient SHOPIFY_ADMIN_ACCESS_TOKEN via OAuth (app Partners déjà installée). Voir README. */
 router.get("/oauth/start", (req, res) => handleOAuthStart(req, res));
