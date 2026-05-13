@@ -14,10 +14,10 @@ import {
 import { linkRechargeSubscriptionToOrder, getOrderIdForRechargeSubscription } from "./lib/mappingStore.js";
 import { reconstructDraftOrderFromSourceOrder } from "./lib/reconstructDraftOrder.js";
 import { handleOAuthStart, handleOAuthCallback, handleOAuthDiagnostic } from "./lib/oauthInstall.js";
+import { getShopifyAdminAccessToken, getShopifyTokenMode } from "./lib/shopifyAccessToken.js";
 
 const {
     SHOPIFY_SHOP,
-    SHOPIFY_ADMIN_ACCESS_TOKEN,
     SHOPIFY_WEBHOOK_SECRET,
     RECHARGE_WEBHOOK_SECRET,
     INTERNAL_RECONSTRUCT_SECRET,
@@ -50,7 +50,7 @@ router.get("/health", (_req, res) => {
         ok: true,
         service: "emeria-backend",
         basePath: PUBLIC_BASE_PATH || "/",
-        oauth: Boolean(process.env.SHOPIFY_CLIENT_ID && process.env.OAUTH_PUBLIC_URL)
+        shopify_token_mode: getShopifyTokenMode()
     });
 });
 
@@ -103,11 +103,12 @@ router.post(
         }
 
         try {
+            const token = await getShopifyAdminAccessToken();
             const extracted = extractSnapshotFromOrder(order);
             const stored = normalizeSnapshotForStorage(extracted, order);
             await upsertOrderSnapshotMetafield(
                 SHOPIFY_SHOP,
-                SHOPIFY_ADMIN_ACCESS_TOKEN,
+                token,
                 order.id,
                 stored
             );
@@ -158,9 +159,10 @@ router.post("/webhooks/recharge", express.raw({ type: "*/*" }), async (req, res)
         const sourceOrderId = shopifyOrderId || getOrderIdForRechargeSubscription(subId);
         if (sourceOrderId) {
             try {
+                const token = await getShopifyAdminAccessToken();
                 await reconstructDraftOrderFromSourceOrder({
                     shop: SHOPIFY_SHOP,
-                    token: SHOPIFY_ADMIN_ACCESS_TOKEN,
+                    token,
                     sourceOrderId,
                     note: `Auto reconstruction — subscription ${subId}`
                 });
@@ -196,9 +198,10 @@ router.post("/hooks/reconstruct", express.json(), async (req, res) => {
     }
 
     try {
+        const token = await getShopifyAdminAccessToken();
         const result = await reconstructDraftOrderFromSourceOrder({
             shop: SHOPIFY_SHOP,
-            token: SHOPIFY_ADMIN_ACCESS_TOKEN,
+            token,
             sourceOrderId,
             note: req.body?.note,
             tags: req.body?.tags

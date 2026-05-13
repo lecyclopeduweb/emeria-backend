@@ -24,62 +24,44 @@ API Node.js (Express) pour figer le snapshot Éméria sur les commandes Shopify 
 **Build command :** `npm install`  
 **Start command :** `npm start`
 
-**Variables d’environnement** (à renseigner dans Render → *Environment*) : voir `.env.example`. Minimum pour les webhooks : `SHOPIFY_SHOP`, `SHOPIFY_ADMIN_ACCESS_TOKEN`, `SHOPIFY_WEBHOOK_SECRET`.  
-**`PORT`** — ne pas forcer sur Render (injecté automatiquement).
-
 Sur `*.onrender.com`, **ne définis pas** `PUBLIC_BASE_PATH` (laisser vide). Les routes sont à la racine du domaine.
 
-### Obtenir `SHOPIFY_ADMIN_ACCESS_TOKEN` (app **Partners** sans nouvelle app « développeur »)
+**Variables d’environnement** (à renseigner dans Render → *Environment*) : voir `.env.example`.  
+**`PORT`** — ne pas forcer sur Render (injecté automatiquement).
 
-Avec une app créée dans **Partners** + distribution personnalisée, Shopify **ne montre pas** un `shpat` à copier : le jeton Admin vient du **flux OAuth**. Ce dépôt inclut une **installation OAuth en une fois** :
+### Jeton Admin API (recommandé — **client credentials**)
 
-1. Dans **Partners** → **emeria-backend** → **Versions** (version active) → ajoute une **URL de redirection** autorisée **exactement** :  
-   **`https://emeria-backend.onrender.com/oauth/callback`**  
-   (ou `OAUTH_REDIRECT_URI` si tu la définis à la main.)
+Pour les apps **Partners** avec **« Utiliser le flux d’installation hérité : false »**, Shopify attend un échange **serveur à serveur**, **sans** redirection navigateur vers `/admin/oauth/authorize`. Voir la doc officielle : [Client credentials grant](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/client-credentials-grant).
 
-2. Sur **Render**, définis au minimum :  
-   - `SHOPIFY_SHOP` = `passion-kanine.myshopify.com`  
-   - `SHOPIFY_CLIENT_ID` = **ID client** Partners  
-   - `SHOPIFY_CLIENT_SECRET` = **Secret** Partners (nouveau)  
-   - `OAUTH_PUBLIC_URL` = `https://emeria-backend.onrender.com`  
-   - Optionnel : `OAUTH_INSTALL_SECRET` = un mot de passe long ; alors l’URL de départ doit inclure `?secret=...`
+Sur Render, définis **uniquement** (sans `SHOPIFY_ADMIN_ACCESS_TOKEN` obligatoire) :
 
-3. **Déploie** le service avec le code à jour (routes `/oauth/...`).
+| Variable | Valeur |
+|----------|--------|
+| `SHOPIFY_SHOP` | `passion-kanine.myshopify.com` |
+| `SHOPIFY_CLIENT_ID` | ID client Partners |
+| `SHOPIFY_CLIENT_SECRET` | Secret Partners |
+| `SHOPIFY_WEBHOOK_SECRET` | En pratique le même **Secret** pour vérifier les webhooks HMAC |
 
-4. Dans le navigateur (connecté en admin sur la **même** boutique), ouvre :  
-   `https://emeria-backend.onrender.com/oauth/start`  
-   ou avec secret :  
-   `https://emeria-backend.onrender.com/oauth/start?secret=TON_OAUTH_INSTALL_SECRET`  
-   ou **debug texte** (sans redirection) :  
-   `https://emeria-backend.onrender.com/oauth/start?debug=1`
+Le code appelle automatiquement :
 
-5. Accepte les droits demandés. La page finale affiche le **jeton** → copie-le dans **`SHOPIFY_ADMIN_ACCESS_TOKEN`** (Render + `.env` local), **redéploie** Render.
+`POST https://{shop}/admin/oauth/access_token`  
+avec `grant_type=client_credentials`, `client_id`, `client_secret` (corps `application/x-www-form-urlencoded`), **met en cache** le jeton et le **rafraîchit** avant expiration (~24 h, marge 5 min).
 
-### Si Shopify affiche « Oops… Unauthorized Access »
+`GET /health` renvoie `shopify_token_mode` : `client_credentials` | `static_admin_token` | `none`.
 
-Ce message vient **de Shopify**, pas de Render. Causes fréquentes :
+**Optionnel — token statique** : si tu définis `SHOPIFY_ADMIN_ACCESS_TOKEN` (ex. `shpat_…` depuis **Développer des applications**), il est **prioritaire** et le client credentials n’est pas utilisé.
 
-1. **`redirect_uri`** dans la version publiée Partners n’est **pas exactement** la même chaîne que celle calculée par le serveur (https, chemin `/oauth/callback`, pas d’espace, pas de slash en trop).  
-   → Ouvre **`https://emeria-backend.onrender.com/oauth/diagnostic`** et compare **`redirect_uri_computed`** avec le champ **URL de redirection** de la version active de l’app.
+### OAuth navigateur (`/oauth/start`) — flux **hérité** uniquement
 
-2. Tu n’es **pas connecté** à l’admin de **cette** boutique dans le même navigateur (ou compte sans droits suffisants).  
-   → Ouvre d’abord `https://admin.shopify.com/store/…` pour **Passion Kanine**, puis réessaie `/oauth/start`.
-
-3. La boutique n’est **pas autorisée** par ta distribution personnalisée.  
-   → Partners → **Distribution** / lien d’installation : vérifie que la boutique peut installer l’app.
-
-4. **Client ID** sur Render ne correspond pas à l’app / à la version publiée (copier-coller depuis **Identifiants** de la même app).
-
-Les scopes OAuth utilisés sont ceux de **`OAUTH_SCOPES`** (défaut : `read_orders,write_orders,write_draft_orders,read_customers`) ; ils doivent être **autorisés** dans la version publiée de l’app Partners.
+Réservé si tu actives **« Utiliser le flux d’installation hérité : true »** dans la version de l’app. Sinon, utilise **client credentials** ci-dessus.
 
 ### URLs à utiliser
 
 | Usage | URL |
 |--------|-----|
-| Santé (test navigateur ou curl) | https://emeria-backend.onrender.com/health |
-| **OAuth (une fois)** | https://emeria-backend.onrender.com/oauth/start |
-| **OAuth diagnostic** | https://emeria-backend.onrender.com/oauth/diagnostic |
-| Webhook Shopify (Admin API / app custom) | https://emeria-backend.onrender.com/webhooks/shopify/orders |
+| Santé | https://emeria-backend.onrender.com/health |
+| OAuth diagnostic (legacy) | https://emeria-backend.onrender.com/oauth/diagnostic |
+| Webhook Shopify | https://emeria-backend.onrender.com/webhooks/shopify/orders |
 | Webhook Recharge (optionnel) | https://emeria-backend.onrender.com/webhooks/recharge |
 | Reconstruction manuelle | `POST` https://emeria-backend.onrender.com/hooks/reconstruct |
 

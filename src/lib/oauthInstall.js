@@ -193,7 +193,7 @@ export async function handleOAuthCallback(req, res) {
     res.send(`<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><title>Token Emeria</title></head><body>
 <h1>Jeton Admin API</h1>
-<p>Copie la valeur ci-dessous dans <strong>SHOPIFY_ADMIN_ACCESS_TOKEN</strong> (fichier .env local et variables d'environnement Render), puis redéploie.</p>
+<p>Copie la valeur ci-dessous dans <strong>SHOPIFY_ADMIN_ACCESS_TOKEN</strong> (Render / .env) <strong>ou</strong> laisse ce champ vide et utilise <strong>client_credentials</strong> (voir README) avec seulement <code>SHOPIFY_CLIENT_ID</code> + <code>SHOPIFY_CLIENT_SECRET</code> + <code>SHOPIFY_SHOP</code>.</p>
 <p><strong>Ne partage pas ce jeton.</strong> Ferme cette page après copie.</p>
 <pre style="word-break:break-all;background:#f4f4f4;padding:1rem;">${escapeHtml(accessToken)}</pre>
 <p>Scopes accordés : <code>${escapeHtml(data.scope || "")}</code></p>
