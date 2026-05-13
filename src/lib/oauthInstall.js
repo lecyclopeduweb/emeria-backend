@@ -48,9 +48,19 @@ export function handleOAuthStart(req, res) {
         .join(",");
 
     const redirectUri = redirectUriFromEnv();
-    if (!shop || !clientId || !redirectUri) {
-        res.status(500).send(
-            "Configure SHOPIFY_SHOP (ou ?shop=), SHOPIFY_CLIENT_ID, OAUTH_PUBLIC_URL (ex. https://emeria-backend.onrender.com)"
+    const rawShop = (req.query.shop || process.env.SHOPIFY_SHOP || "").trim();
+    const missing = [];
+    if (!shop) {
+        if (!rawShop) missing.push("SHOPIFY_SHOP (ou ?shop=xxx.myshopify.com)");
+        else missing.push("SHOPIFY_SHOP invalide (doit être xxx.myshopify.com, sans https)");
+    }
+    if (!clientId) missing.push("SHOPIFY_CLIENT_ID");
+    if (!redirectUri) missing.push("OAUTH_PUBLIC_URL (ex. https://emeria-backend.onrender.com) ou OAUTH_REDIRECT_URI en entier");
+
+    if (missing.length) {
+        res.status(500).type("text/plain; charset=utf-8").send(
+            `Variables manquantes ou invalides sur Render :\n- ${missing.join("\n- ")}\n\n`
+            + "Vérifie Environment → Environment Variables → Save, puis redémarre le service."
         );
         return;
     }
