@@ -36,6 +36,17 @@ function buildAuthorizeUrl(shop, clientId, scopes, redirectUri, state) {
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("state", state);
     url.searchParams.set("response_type", "code");
+    /** Jeton « offline » pour backend. Désactiver : OAUTH_GRANT_OPTIONS=none */
+    const rawGrant = process.env.OAUTH_GRANT_OPTIONS;
+    const grant =
+        rawGrant === undefined || String(rawGrant).trim() === ""
+            ? "offline"
+            : String(rawGrant).trim();
+    if (grant && !["none", "0", "false"].includes(grant.toLowerCase())) {
+        for (const g of grant.split(",").map((s) => s.trim()).filter(Boolean)) {
+            url.searchParams.append("grant_options[]", g);
+        }
+    }
     return url.toString();
 }
 
@@ -69,9 +80,11 @@ export function handleOAuthDiagnostic(req, res) {
             redirect_ok: Boolean(redirectUri)
         },
         tips: [
-            "Dans Partners → version active de l’app, l’URL de redirection autorisée doit être EXACTEMENT la même que redirect_uri_computed (https, pas d’espace, pas de slash en trop).",
-            "Ouvre d’abord l’admin Shopify de cette boutique dans le même navigateur (connexion propriétaire ou staff avec droits apps), puis relance /oauth/start.",
-            "Si l’app n’est pas autorisée pour cette boutique (distribution personnalisée), ajoute la boutique ou utilise le lien d’installation Partners avant OAuth."
+            "L’affichage [\"https://…\"] dans la version Partners est normal (liste JSON) ; Shopify compare à l’URL seule.",
+            "Si tu as installé l’app en navigation privée mais ouvert /oauth/start en fenêtre normale (ou l’inverse), la session peut ne pas correspondre → refais tout dans le même mode (idéalement tout en navigation normale, même profil).",
+            "Connecte-toi d’abord à l’admin de la boutique (passion-kanine), puis dans le même onglet ou une fenêtre du même profil ouvre /oauth/start.",
+            "Si l’erreur continue : Partners → contacter le support Shopify avec le Request ID affiché sur la page d’erreur.",
+            "Test sans grant offline : sur Render, variable OAUTH_GRANT_OPTIONS=none puis redéploie et réessaie (rare conflit selon type d’app)."
         ]
     });
 }
